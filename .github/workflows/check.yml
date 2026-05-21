@@ -1,0 +1,51 @@
+name: BMW i4 inventory check
+
+on:
+  schedule:
+    # Every 30 minutes. GitHub may delay scheduled runs by 5-15 min under load.
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}  # allow manual trigger from the Actions tab
+
+# Required so the workflow can commit the updated seen_vins.json back.
+permissions:
+  contents: write
+
+concurrency:
+  group: bmw-i4-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Run inventory check
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          SMS_TO: ${{ secrets.SMS_TO }}
+          # Optional: leave unset until you wire up Telegram.
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python check.py
+
+      - name: Commit state if changed
+        run: |
+          if ! git diff --quiet seen_vins.json; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add seen_vins.json
+            git commit -m "Update seen VINs ($(date -u +%Y-%m-%dT%H:%MZ))"
+            git push
+          else
+            echo "No state changes."
+          fi
