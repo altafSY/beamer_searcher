@@ -1,6 +1,6 @@
 # BMW i4 eDrive35 CPO inventory monitor
 
-Polls ~8 BMW dealer sites in the DC/Baltimore/Richmond area every 30 minutes
+Polls 9 BMW dealer sites in the DC/Baltimore/Richmond area three times a day
 and texts you when a Certified Pre-Owned i4 eDrive35 lands that matches your
 filters. Runs entirely on GitHub Actions — free.
 
@@ -30,7 +30,8 @@ filling in `send_telegram` and adding the two secrets below.
 | Passport BMW | DealerOn |
 | BMW of Fairfax | Dealer.com |
 | BMW of Alexandria | Dealer.com |
-| Richmond BMW | Dealer.com |
+| Crown Richmond BMW | Dealer.com |
+| Richmond BMW Midlothian | Dealer.com |
 | BMW of Silver Spring | Dealer.com |
 | BMW of Towson | Dealer.com |
 | BMW of Catonsville | Dealer.com |
@@ -126,14 +127,15 @@ send_sms({'vin':'TEST','dealer':'Test','price':35000,'mileage':25000,'color':'Te
   repo on every run with changes, which counts as activity — so this only
   becomes an issue if zero new matches show up for 60+ days. If that happens,
   push any dummy commit to re-enable.
-- Polling cadence is `*/30 * * * *` (every 30 min). GitHub may delay scheduled
-  runs by 5–15 min under load. Change in [check.yml](.github/workflows/check.yml).
+- Polling cadence is `0 12,17,23 * * *` (3x/day at ~8am, 1pm, 7pm ET during EDT;
+  shifts 1hr during EST). GitHub may delay scheduled runs by 5–15 min under load.
+  Change in [check.yml](.github/workflows/check.yml).
 - Dealer sites change their HTML/JSON structure occasionally — if a dealer
   stops returning candidates and you can't see why, fetch
   `https://{host}/...inventory page...` locally and diff against the parsing
   in `fetch_dealeron` / `fetch_dealercom`.
-- The 30-min schedule fits comfortably in the GitHub Actions free tier
-  (~1500 minutes/month used; the limit on private repos is 2000).
+- 3x/day uses about 23 min/month of Actions time — ~1% of the 2,000-min free
+  tier on private repos (unlimited on public).
 
 ## Caveats
 

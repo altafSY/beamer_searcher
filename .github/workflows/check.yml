@@ -2,8 +2,9 @@ name: BMW i4 inventory check
 
 on:
   schedule:
-    # Every 30 minutes. GitHub may delay scheduled runs by 5-15 min under load.
-    - cron: "*/30 * * * *"
+    # 3x/day at ~8am, 1pm, 7pm ET (during EDT). UTC offsets shift 1hr during EST.
+    # GitHub may delay scheduled runs by 5-15 min under load.
+    - cron: "0 12,17,23 * * *"
   workflow_dispatch: {}  # allow manual trigger from the Actions tab
 
 # Required so the workflow can commit the updated seen_vins.json back.
