@@ -33,7 +33,20 @@ MAX_PRICE = 39_000
 MAX_MILEAGE = 33_000
 TARGET_TRIM_FRAGMENT = "edrive35"
 EXCLUDED_COLOR_FRAGMENT = "white"
-REQUIRED_AUDIO_FRAGMENTS = ("harman", "kardon")  # both must appear (case-insensitive)
+HARMAN_FRAGMENTS = ("harman", "kardon")  # both must appear (case-insensitive); used as a flag, not a filter
+
+# Known BMW packages we look for in DealerOn comment blobs. Order doesn't matter.
+DEALERON_KNOWN_PACKAGES = (
+    "Driving Assistance Pro",
+    "Driving Assistance Package",
+    "Connected Package Pro",
+    "Parking Assistance Package",
+    "Premium Package",
+    "Convenience Package",
+    "Executive Package",
+    "M Sport Package",
+    "Shadowline",
+)
 
 UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
@@ -146,6 +159,7 @@ def fetch_dealeron(host: str) -> list[dict]:
             "price": _dealeron_decode_price(c.get("VehiclePriceLibrary") or ""),
             "url": c.get("VehicleDetailUrl") or "",
             "has_harman": _has_harman(comments),
+            "packages": _extract_dealeron_packages(comments),
             "extra_count": _count_extras(features, comments),
         })
     return out
@@ -206,7 +220,8 @@ def fetch_dealercom(host: str) -> list[dict]:
         else:
             full_url = link
 
-        packages = item.get("packages") or []
+        raw_packages = item.get("packages") or []
+        packages = _clean_dealercom_packages(raw_packages)
         option_codes = item.get("optionCodes") or []
 
         # has_harman is unknown without VDP fetch; we set it lazily in main loop.
@@ -222,7 +237,8 @@ def fetch_dealercom(host: str) -> list[dict]:
             "_vdp_link": link,
             "_needs_vdp_check": True,
             "has_harman": False,  # filled in main loop after cheap filters pass
-            "extra_count": len(packages) + len(option_codes),
+            "packages": packages,
+            "extra_count": len(raw_packages) + len(option_codes),
         })
     return out
 
@@ -240,7 +256,26 @@ def _parse_int(s) -> int | None:
 
 def _has_harman(text: str) -> bool:
     t = (text or "").lower()
-    return all(frag in t for frag in REQUIRED_AUDIO_FRAGMENTS)
+    return all(frag in t for frag in HARMAN_FRAGMENTS)
+
+
+def _extract_dealeron_packages(comments: str) -> list[str]:
+    if not comments:
+        return []
+    c = comments.lower()
+    return [pkg for pkg in DEALERON_KNOWN_PACKAGES if pkg.lower() in c]
+
+
+def _clean_dealercom_packages(raw: list) -> list[str]:
+    """Dealer.com lumps wheel options into 'packages'; trim noisy entries for SMS display."""
+    out = []
+    for p in raw or []:
+        if not isinstance(p, str):
+            continue
+        if p.lower().startswith(("wheels:", "tires:")):
+            continue
+        out.append(p)
+    return out
 
 
 def _count_extras(features, comments: str) -> int:
@@ -319,11 +354,10 @@ def main() -> int:
         for v in vehicles:
             if not passes_cheap_filters(v):
                 continue
-            # Need VDP fetch for Harman detection on Dealer.com
+            # Harman/Kardon is reported as a flag (not a filter). For Dealer.com
+            # we need the VDP to check it.
             if v.get("_needs_vdp_check") and not v.get("has_harman"):
                 v["has_harman"] = _dealercom_vdp_has_harman(host, v.get("_vdp_link", ""))
-            if not v.get("has_harman"):
-                continue
             match = {
                 "vin": v["vin"],
                 "dealer": name,
@@ -333,12 +367,15 @@ def main() -> int:
                 "mileage": v["mileage"],
                 "color": v["color"],
                 "url": v["url"],
+                "has_harman": bool(v.get("has_harman")),
+                "packages": v.get("packages") or [],
                 "extra_count": v["extra_count"],
             }
             all_matches.append(match)
-            log.info("MATCH %s %s %sk@$%s %s",
+            log.info("MATCH %s %s %sk@$%s H/K=%s %s",
                      match["vin"], match["color"], match["mileage"] // 1000,
                      f"{match['price']:,}",
+                     "Y" if match["has_harman"] else "N",
                      "<-- already notified" if match["vin"] in seen else "(NEW)")
         time.sleep(0.5)
 

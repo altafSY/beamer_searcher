@@ -13,12 +13,15 @@ GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "")
 
 
 def _format_sms(match: dict) -> str:
-    """Single short SMS body. vtext truncates around 160 chars."""
+    """SMS body. Carrier gateways will split into segments past ~160 chars."""
     m = match
-    pkg_note = f" +{m['extra_count']} feats" if m.get("extra_count") else ""
+    hk = "Y" if m.get("has_harman") else "N"
+    pkgs = m.get("packages") or []
+    pkg_line = f"\nPkgs: {', '.join(pkgs)}" if pkgs else "\nPkgs: (none listed)"
     return (
-        f"BMW i4 eDrive35 CPO @ {m['dealer']}\n"
-        f"${m['price']:,} | {m['mileage']:,}mi | {m['color']}{pkg_note}\n"
+        f"i4 eDrive35 CPO @ {m['dealer']}\n"
+        f"${m['price']:,} | {m['mileage']:,}mi | {m['color']}\n"
+        f"H/K: {hk}{pkg_line}\n"
         f"{m['url']}"
     )
 
