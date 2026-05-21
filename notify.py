@@ -7,7 +7,7 @@ from email.message import EmailMessage
 
 log = logging.getLogger(__name__)
 
-SMS_TO = os.environ.get("SMS_TO", "REDACTED@vtext.com")
+SMS_TO = os.environ.get("SMS_TO", "")
 GMAIL_USER = os.environ.get("GMAIL_USER", "")
 GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "")
 
@@ -24,9 +24,9 @@ def _format_sms(match: dict) -> str:
 
 
 def send_sms(match: dict) -> bool:
-    """Send a single match notification as SMS via Gmail->vtext.com gateway."""
-    if not GMAIL_USER or not GMAIL_APP_PASSWORD:
-        log.error("GMAIL_USER / GMAIL_APP_PASSWORD not set; cannot send SMS.")
+    """Send a single match notification as SMS via Gmail->carrier email gateway."""
+    if not GMAIL_USER or not GMAIL_APP_PASSWORD or not SMS_TO:
+        log.error("GMAIL_USER / GMAIL_APP_PASSWORD / SMS_TO not set; cannot send SMS.")
         return False
 
     body = _format_sms(match)
