@@ -19,7 +19,7 @@ def _format_sms(match: dict) -> str:
     pkgs = m.get("packages") or []
     pkg_line = f"\nPkgs: {', '.join(pkgs)}" if pkgs else "\nPkgs: (none listed)"
     return (
-        f"i4 eDrive35 CPO @ {m['dealer']}\n"
+        f"i4 {m['trim']} CPO @ {m['dealer']}\n"
         f"${m['price']:,} | {m['mileage']:,}mi | {m['color']}\n"
         f"H/K: {hk}{pkg_line}\n"
         f"{m['url']}"

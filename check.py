@@ -31,7 +31,7 @@ STATE_FILE = ROOT / "seen_vins.json"
 # Filter targets (with deliberate buffers above the user's stated caps).
 MAX_PRICE = 39_000
 MAX_MILEAGE = 33_000
-TARGET_TRIM_FRAGMENT = "edrive35"
+TARGET_TRIM_FRAGMENTS = ("edrive35", "edrive40")
 EXCLUDED_COLOR_FRAGMENT = "white"
 HARMAN_FRAGMENTS = ("harman", "kardon")  # both must appear (case-insensitive); used as a flag, not a filter
 
@@ -290,7 +290,8 @@ def _count_extras(features, comments: str) -> int:
 
 def passes_cheap_filters(v: dict) -> bool:
     """All filters that can be applied without a VDP fetch."""
-    if TARGET_TRIM_FRAGMENT not in (v.get("trim") or "").lower():
+    trim = (v.get("trim") or "").lower()
+    if not any(frag in trim for frag in TARGET_TRIM_FRAGMENTS):
         return False
     if not v.get("cpo"):
         return False
