@@ -5,6 +5,8 @@ import smtplib
 import logging
 from email.message import EmailMessage
 
+import requests
+
 log = logging.getLogger(__name__)
 
 SMS_TO = os.environ.get("SMS_TO", "")
@@ -12,17 +14,47 @@ GMAIL_USER = os.environ.get("GMAIL_USER", "")
 GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "")
 
 
+def _shorten_url(url: str) -> str:
+    """Shorten via TinyURL (no auth, no key) so the link survives the SMS
+    segment split. Falls back to the original URL on any failure."""
+    if not url:
+        return ""
+    try:
+        r = requests.get(
+            "https://tinyurl.com/api-create.php",
+            params={"url": url},
+            timeout=10,
+        )
+        r.raise_for_status()
+        short = r.text.strip()
+        if short.startswith("http"):
+            return short
+        log.warning("tinyurl returned non-URL: %r", short[:120])
+    except Exception as e:
+        log.warning("URL shorten failed for %s: %s", url, e)
+    return url
+
+
 def _format_sms(match: dict) -> str:
-    """SMS body. Carrier gateways will split into segments past ~160 chars."""
+    """Compact SMS body. Aim for a single ~160-char SMS segment so the URL
+    isn't split across parts."""
     m = match
     hk = "Y" if m.get("has_harman") else "N"
-    pkgs = m.get("packages") or []
-    pkg_line = f"\nPkgs: {', '.join(pkgs)}" if pkgs else "\nPkgs: (none listed)"
+    # Strip noise so packages fit
+    pkgs_raw = m.get("packages") or []
+    pkgs_short = [
+        p.replace(" Package", "").replace("Connected Package Pro", "ConnectedPro")
+        for p in pkgs_raw
+    ]
+    pkg_str = ", ".join(pkgs_short) if pkgs_short else "none"
+    dealer = m["dealer"].replace("BMW of ", "")
+    color = (m.get("color") or "").replace(" Metallic", "")
+    short_url = _shorten_url(m["url"])
     return (
-        f"i4 {m['trim']} CPO @ {m['dealer']}\n"
-        f"${m['price']:,} | {m['mileage']:,}mi | {m['color']}\n"
-        f"H/K: {hk}{pkg_line}\n"
-        f"{m['url']}"
+        f"i4 {m['trim']} @ {dealer}\n"
+        f"${m['price']:,} | {m['mileage']:,}mi | {color}\n"
+        f"H/K:{hk} | {pkg_str}\n"
+        f"{short_url}"
     )
 
 
